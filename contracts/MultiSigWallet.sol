@@ -14,9 +14,9 @@ contract MultiSigWallet {
     event RevokeConfirmation(address indexed owner, uint indexed txIndex);
     event ExecuteTransaction(address indexed owner, uint indexed txIndex);
 
-    address[] public owners;
+    address[] owners;
     mapping(address => bool) public isOwner;
-    uint public numConfirmationsRequired;
+    uint numConfirmationsRequired;
 
     struct Transaction {
         address to;
@@ -168,5 +168,5 @@ contract MultiSigWallet {
             transaction.numConfirmations
         );
     }
-    
+
 }
