@@ -14,6 +14,36 @@ contract MultiSigWallet {
     event RevokeConfirmation(address indexed owner, uint indexed txIndex);
     event ExecuteTransaction(address indexed owner, uint indexed txIndex);
 
+    event DepositERC20(
+        address minter, 
+        address indexed sender, 
+        uint amount, 
+        uint balance
+        );
+    event SubmitERC20Transaction(
+        address minter,
+        address indexed owner,
+        uint indexed txIndex,
+        address indexed to,
+        uint value,
+        bytes data
+    );
+    event ConfirmERC20Transaction(
+        address minter,
+        address indexed owner, 
+        uint indexed txIndex
+    );
+    event RevokeERC20Confirmation(
+        address minter,
+        address indexed owner, 
+        uint indexed txIndex
+    );
+    event ExecuteERC20Transaction(
+        address minter,
+        address indexed owner, 
+        uint indexed txIndex
+    );
+
     address[] owners;
     mapping(address => bool) public isOwner;
     uint numConfirmationsRequired;
@@ -26,10 +56,20 @@ contract MultiSigWallet {
         uint numConfirmations;
     }
 
+    struct ERC20Transaction{
+        address erc20minter;
+        address to;
+        uint value;
+        bytes data;
+        bool executed;
+        uint numConfirmations;
+    }
+
     // mapping from tx index => owner => bool
     mapping(uint => mapping(address => bool)) public isConfirmed;
 
-    Transaction[] public transactions;
+    Transaction[] transactions;
+    ERC20Transaction[] erc20transactions;
 
     modifier onlyOwner() {
         require(isOwner[msg.sender], "not owner");
@@ -161,6 +201,114 @@ contract MultiSigWallet {
         Transaction storage transaction = transactions[_txIndex];
 
         return (
+            transaction.to,
+            transaction.value,
+            transaction.data,
+            transaction.executed,
+            transaction.numConfirmations
+        );
+    }
+
+    function submitERC20Transaction(
+        address _minter,
+        address _to,
+        uint _value,
+        bytes memory _data
+    ) public onlyOwner {
+        uint txIndex = erc20transactions.length;
+
+        erc20transactions.push(
+            ERC20Transaction({
+                erc20minter: _minter,
+                to: _to,
+                value: _value,
+                data: _data,
+                executed: false,
+                numConfirmations: 0
+            })
+        );
+
+        emit SubmitERC20Transaction(
+            _minter,
+            msg.sender, 
+            txIndex, 
+            _to, 
+            _value, 
+            _data
+        );
+    }
+
+    function confirmERC20Transaction(
+        uint _txIndex
+    ) public onlyOwner txExists(_txIndex) notExecuted(_txIndex) notConfirmed(_txIndex) {
+        ERC20Transaction storage transaction = erc20transactions[_txIndex];
+        transaction.numConfirmations += 1;
+        isConfirmed[_txIndex][msg.sender] = true;
+
+        emit ConfirmERC20Transaction(
+            transaction.erc20minter,
+            msg.sender,
+            _txIndex
+        );
+    }
+
+    function executeERC20Transaction(
+        uint _txIndex
+    ) public onlyOwner txExists(_txIndex) notExecuted(_txIndex) {
+        ERC20Transaction storage transaction = erc20transactions[_txIndex];
+
+        require(
+            transaction.numConfirmations >= numConfirmationsRequired,
+            "cannot execute tx"
+        );
+
+        transaction.executed = true;
+
+        (bool success, ) = transaction.to.call{value: transaction.value}(
+            transaction.data
+        );
+        require(success, "tx failed");
+
+        emit ExecuteERC20Transaction(
+            transaction.erc20minter,
+            msg.sender, 
+            _txIndex
+        );
+    }
+
+    function revokeERC20Confirmation(
+        uint _txIndex
+    ) public onlyOwner txExists(_txIndex) notExecuted(_txIndex) {
+        ERC20Transaction storage transaction = erc20transactions[_txIndex];
+
+        require(isConfirmed[_txIndex][msg.sender], "tx not confirmed");
+
+        transaction.numConfirmations -= 1;
+        isConfirmed[_txIndex][msg.sender] = false;
+
+        emit RevokeERC20Confirmation(
+            transaction.erc20minter,
+            msg.sender, 
+            _txIndex
+        );
+    }
+
+    function getERC20Transaction(
+        uint _txIndex
+    ) public view
+        returns (
+            address minter,
+            address to,
+            uint value,
+            bytes memory data,
+            bool executed,
+            uint numConfirmations
+        )
+    {
+        ERC20Transaction storage transaction = erc20transactions[_txIndex];
+
+        return (
+            transaction.erc20minter,
             transaction.to,
             transaction.value,
             transaction.data,
