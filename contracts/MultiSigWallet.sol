@@ -67,6 +67,7 @@ contract MultiSigWallet {
 
     // mapping from tx index => owner => bool
     mapping(uint => mapping(address => bool)) public isConfirmed;
+    mapping(uint => mapping(address => bool)) public isERC20Confirmed;
 
     Transaction[] transactions;
     ERC20Transaction[] erc20transactions;
@@ -88,6 +89,21 @@ contract MultiSigWallet {
 
     modifier notConfirmed(uint _txIndex) {
         require(!isConfirmed[_txIndex][msg.sender], "tx already confirmed");
+        _;
+    }
+
+    modifier ERC20txExists(uint _txIndex) {
+        require(_txIndex < erc20transactions.length, "tx does not exist");
+        _;
+    }
+
+    modifier ERC20notExecuted(uint _txIndex) {
+        require(!erc20transactions[_txIndex].executed, "tx already executed");
+        _;
+    }
+
+    modifier ERC20notConfirmed(uint _txIndex) {
+        require(!isERC20Confirmed[_txIndex][msg.sender], "tx already confirmed");
         _;
     }
 
@@ -183,6 +199,10 @@ contract MultiSigWallet {
         return owners;
     }
 
+    function getContractAddress() public view returns (address) {
+        return address(this);
+    }
+
     function getTransactionCount() public view returns (uint) {
         return transactions.length;
     }
@@ -240,7 +260,7 @@ contract MultiSigWallet {
 
     function confirmERC20Transaction(
         uint _txIndex
-    ) public onlyOwner txExists(_txIndex) notExecuted(_txIndex) notConfirmed(_txIndex) {
+    ) public onlyOwner ERC20txExists(_txIndex) ERC20notExecuted(_txIndex) ERC20notConfirmed(_txIndex) {
         ERC20Transaction storage transaction = erc20transactions[_txIndex];
         transaction.numConfirmations += 1;
         isConfirmed[_txIndex][msg.sender] = true;
@@ -254,7 +274,7 @@ contract MultiSigWallet {
 
     function executeERC20Transaction(
         uint _txIndex
-    ) public onlyOwner txExists(_txIndex) notExecuted(_txIndex) {
+    ) public onlyOwner ERC20txExists(_txIndex) ERC20notExecuted(_txIndex) {
         ERC20Transaction storage transaction = erc20transactions[_txIndex];
 
         require(
@@ -278,7 +298,7 @@ contract MultiSigWallet {
 
     function revokeERC20Confirmation(
         uint _txIndex
-    ) public onlyOwner txExists(_txIndex) notExecuted(_txIndex) {
+    ) public onlyOwner ERC20txExists(_txIndex) ERC20notExecuted(_txIndex) {
         ERC20Transaction storage transaction = erc20transactions[_txIndex];
 
         require(isConfirmed[_txIndex][msg.sender], "tx not confirmed");
