@@ -1,6 +1,8 @@
 
 pragma solidity ^0.8.4;
 
+import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+
 contract MultiSigWallet {
     event Deposit(address indexed sender, uint amount, uint balance);
     event SubmitTransaction(
@@ -284,10 +286,7 @@ contract MultiSigWallet {
 
         transaction.executed = true;
 
-        (bool success, ) = transaction.to.call{value: transaction.value}(
-            transaction.data
-        );
-        require(success, "tx failed");
+        ERC20(transaction.erc20minter).transfer(transaction.to, transaction.value);
 
         emit ExecuteERC20Transaction(
             transaction.erc20minter,

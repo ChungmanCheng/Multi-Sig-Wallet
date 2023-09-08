@@ -1,5 +1,6 @@
 require("@nomicfoundation/hardhat-toolbox");
 require("@nomiclabs/hardhat-ganache");
+require("@nomiclabs/hardhat-ethers");
 require("solidity-coverage");
 require("hardhat-deploy");
 
