@@ -15,7 +15,6 @@ const bigInt = require("big-integer");
             await deployments.fixture(["all"]);
             const Wallet = await ethers.getContractFactory("MultiSigWallet");
             wallet = await Wallet.deploy( [deployer.toString(), accounts[1].address.toString(), accounts[2].address.toString()], "2" );
-            console.log( wallet );
         });
 
         describe("Constructor", () => {
@@ -59,22 +58,21 @@ const bigInt = require("big-integer");
                 const account2Signer = await ethers.provider.getSigner(deployer.toString());
                 const Wallet = wallet.connect( account2Signer );
                 // deposit fund
-                // await ethers.provider.send('eth_sendTransaction', [
-                //     {
-                //       from: deployer.toString(),
-                //       to: Wallet.address,
-                //       value: '0x' + Number("1000000000000000000").toString(16),
-                //     },
-                // ]);
-                console.log( "wallet: " + Wallet.target + " balance: " + await ethers.provider.getBalance(Wallet.target) );
+                await ethers.provider.send('eth_sendTransaction', [
+                    {
+                      from: deployer.toString(),
+                      to: await Wallet.getContractAddress(),
+                      value: '0x' + Number("1000000000000000000").toString(16),
+                    },
+                ]);
                 const account2Signer2 = await ethers.provider.getSigner(accounts[1].address.toString());
                 const Wallet2 = wallet.connect( account2Signer2 );
                 await Wallet.submitTransaction( accounts[1].address.toString(), "1000000000000000000", "0x00" );
                 await Wallet.confirmTransaction("0");
                 await Wallet2.confirmTransaction("0");
-                await expect( Wallet.executeTransaction("0") ).to.be.revertedWith(
-                    'cannot execute tx'
-                );
+                await Wallet.executeTransaction("0");
+                var expected = bigInt(await ethers.provider.getBalance(accounts[1].address.toString())).minus(bigInt("10000000000000000000000")).add("100000000000000000").divide("1000000000000000000");
+                assert.equal( expected.toString(), bigInt("1000000000000000000").divide("1000000000000000000").toString() );
             });
 
         });
